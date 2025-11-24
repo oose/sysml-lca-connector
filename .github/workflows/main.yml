@@ -31,16 +31,23 @@ jobs:
       - name: Build EXE with PyInstaller
         shell: bash
         run: |
-          pyinstaller --onefile \
+          pyinstaller --onefile --windowed \
             --name sysml-lca-connector \
+            --icon=src/logo.ico \
             src/sysml-lca-connector.py
-
+            
+      - name: Prepare artifact folder
+        run: |
+          mkdir artifact
+          copy dist\sysml-lca-connector.exe artifact\
+          copy release-assets\readme.md artifact\
+          
       - name: Upload EXE as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sysml-lca-connector-exe
-          path: dist/sysml-lca-connector.exe
-
+          name: sysml-lca-connector
+          path: artifact\
+          
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         id: create_release
@@ -63,3 +70,15 @@ jobs:
           asset_path: dist/sysml-lca-connector.exe
           asset_name: sysml-lca-connector-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
+          
+      - name: Upload Windows info file to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release_assets/readme.md
+          asset_name: readme.md
+          asset_content_type: text/plain
+
