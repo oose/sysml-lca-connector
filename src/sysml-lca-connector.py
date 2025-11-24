@@ -1,5 +1,12 @@
 import os
 import sys
+import logging
+logging.basicConfig(
+    filename="startup.log",
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s: %(message)s",
+)
+logging.debug("Vor allen Imports")
 from PyQt5.QtWidgets import QApplication, QMainWindow, QActionGroup, QSizePolicy, QMessageBox
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QListWidget
@@ -9,6 +16,8 @@ import configparser
 from SysMLAPI import getProjects, deleteProject
 from SysMLwithLCA import SysMLLCAModel
 from openLCAAPI import openLCAServer
+
+
 
 def read_preferences():
     # Read preferences from a configuration file
@@ -420,9 +429,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to synchronize: {e}.")
 
 if __name__ == "__main__":
+    logging.debug("im main block")
     try:
         app = QApplication(sys.argv)
-        QMessageBox.information(None, "Debug", "Vor dem Anzeigen des Hauptfensters")
         window = MainWindow()
         window.show()
         sys.exit(app.exec())
