@@ -420,8 +420,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to synchronize: {e}.")
 
 if __name__ == "__main__":
-    print("SysML-LCA connector")
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+    try:
+        app = QApplication(sys.argv)
+        window = MainWindow()
+        window.show()
+        sys.exit(app.exec())
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)
