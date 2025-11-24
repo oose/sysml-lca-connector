@@ -1,3 +1,4 @@
+import os
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QActionGroup, QSizePolicy, QMessageBox
 from PyQt5.QtGui import QIcon
@@ -11,25 +12,27 @@ from openLCAAPI import openLCAServer
 
 def read_preferences():
     # Read preferences from a configuration file
-    # Implement your logic here to read preferences from a configuration file
-    # and return them as a dictionary
     config = configparser.ConfigParser()
-    config.read('preferences.ini')
+    config_path = os.path.join(os.path.dirname(__file__), 'preferences.ini')
+    # the config file is expected to be in the same directory as this script
+    config.read(config_path)
 
-    preferences = {}
-    if 'DEFAULT' in config:
-        preferences = config['DEFAULT']
-
+    preferences = config['DEFAULT']
+    if len(preferences) == 0:
+        # set default preferences
+        preferences = {
+            "sysmlserver": "http://localhost:9000",
+            "openlcaserver": "http://localhost:8080",
+            "recent_projects": ""
+        }
     return preferences
 
 def safe_preferences(preferences):
-    # Write preferences to a configuration file
-    # Implement your logic here to write preferences to a configuration file
-    # based on the input dictionary
     config = configparser.ConfigParser()
     config['DEFAULT'] = preferences
 
-    with open('preferences.ini', 'w') as configfile:
+    config_path = os.path.join(os.path.dirname(__file__), 'preferences.ini')
+    with open(config_path, 'w') as configfile:
         config.write(configfile)
     
     pass
@@ -38,7 +41,7 @@ def safe_preferences(preferences):
 
 class MainWindow(QMainWindow):
     preferences=None
-    host=None
+    sysmlserver=None
     openLCAServerURL=None
     theModel=None
 
@@ -48,9 +51,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("SysML-LCA connector")
         self.preferences=read_preferences()
         # tbd: handle missing preferences
-        self.host=self.preferences["host"]
+        self.sysmlserver=self.preferences["sysmlserver"]
         self.setWindowIcon(QIcon('logo.png'))
-        self.openLCAServerURL=self.preferences["openLCAServer"]
+        self.openLCAServerURL=self.preferences["openlcaserver"]
 
         self.createMenuBar()
         # Create a QWebEngineView widget
@@ -75,13 +78,16 @@ class MainWindow(QMainWindow):
         self.statusBar().clearMessage()
 
     def select_project_dialog(self):
-
         project = None
-        projects = getProjects(self.host)
+        try:
+            projects = getProjects(self.sysmlserver)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to get projects: {e}")
+            return
         filtered_projects = projects
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Select Project from " + self.host)
+        dialog.setWindowTitle("Select Project from " + self.sysmlserver)
         dialog.setGeometry(100, 100, 1000, 800)
 
         layout = QVBoxLayout(dialog)
@@ -137,7 +143,7 @@ class MainWindow(QMainWindow):
             project = filtered_projects[index]
             dialog.accept()
             try :
-                deleteProject(self.host, project['@id'])
+                deleteProject(self.sysmlserver, project['@id'])
                 print("project deleted: ", project)
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to delete project: {e}")
@@ -179,7 +185,7 @@ class MainWindow(QMainWindow):
         self.updateStatusBar(f"Opening project {theProject['name']}")
         # tbd: is not updated WTF
         print(f"Opening project {theProject['name']}")
-        self.theModel= SysMLLCAModel(self.host, theProject['@id'])
+        self.theModel= SysMLLCAModel(self.sysmlserver, theProject['@id'])
         self.update_recent_projects(theProject['@id'],theProject['name'])
         self.setWindowTitle(f"{self.theModel.name} - SysML Life cycle analyzer")
         self.set_SysML_Model_view()
@@ -246,10 +252,10 @@ class MainWindow(QMainWindow):
         # Implement your logic here to open a dialog for handling preferences
         # You can use tkinter's messagebox or a custom dialog box
         def ok_button_clicked():
-            self.host = entrySysML.get()
-            self.preferences["host"] = self.host
+            self.sysmlserver = entrySysML.get()
+            self.preferences["sysmlserver"] = self.sysmlserver
             self.openLCAServerURL = entryLCA.get()
-            self.preferences["openLCAServer"] = self.openLCAServerURL
+            self.preferences["openlcaserver"] = self.openLCAServerURL
             safe_preferences(self.preferences)
             dialog.destroy()
 
@@ -262,11 +268,11 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout(dialog)
 
-        host_label = QLabel("Host")
-        layout.addWidget(host_label)
+        sysmlserver_label = QLabel("SysML Server")
+        layout.addWidget(sysmlserver_label)
 
         entrySysML = QLineEdit()
-        entrySysML.setText(self.host)
+        entrySysML.setText(self.sysmlserver)
         layout.addWidget(entrySysML)
 
         openLCA_label = QLabel("openLCA Server")
@@ -284,10 +290,10 @@ class MainWindow(QMainWindow):
         layout.addLayout(button_layout)
 
         def ok_button_clicked():
-            self.host = entrySysML.text()
-            self.preferences["host"] = self.host
+            self.sysmlserver = entrySysML.text()
+            self.preferences["sysmlserver"] = self.sysmlserver
             self.openLCAServerURL = entryLCA.text()
-            self.preferences["openLCAServer"] = self.openLCAServerURL
+            self.preferences["openlcaserver"] = self.openLCAServerURL
             safe_preferences(self.preferences)
             dialog.accept()
 
@@ -376,10 +382,14 @@ class MainWindow(QMainWindow):
         return s
 
     def set_LCA_Flows_view(self):
-        theLCAServer= openLCAServer(self.openLCAServerURL)
-        self.browser.setHtml("")
-        flowsPackage = theLCAServer.getSysMLFlowsPackage("sysml")
-        self.browser.setHtml(f"<html><body><pre><code>{flowsPackage}</code></pre></body></html>")
+        try:
+            theLCAServer= openLCAServer(self.openLCAServerURL)
+            self.browser.setHtml("")
+            flowsPackage = theLCAServer.getSysMLFlowsPackage("sysml")
+            self.browser.setHtml(f"<html><body><pre><code>{flowsPackage}</code></pre></body></html>")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+            return
 
     def set_LCA_Processes_view(self):
         self.browser.setHtml(self.get_LCA_processes())
