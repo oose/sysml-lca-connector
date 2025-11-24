@@ -1,12 +1,27 @@
 import os
 import sys
 import logging
+from pathlib import Path
+
+# Basisverzeichnis bestimmen (neben der EXE, wenn gefrozener PyInstaller-Build)
+if getattr(sys, "frozen", False):
+    base_dir = Path(sys.executable).parent
+else:
+    base_dir = Path(__file__).parent
+
+log_path = base_dir / "startup.log"
+
 logging.basicConfig(
-    filename="startup.log",
+    filename=str(log_path),
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s: %(message)s",
 )
+
 logging.debug("Vor allen Imports")
+logging.debug("cwd=%s", os.getcwd())
+logging.debug("executable=%s", sys.executable)
+logging.debug("frozen=%s", getattr(sys, "frozen", False))
+
 from PyQt5.QtWidgets import QApplication, QMainWindow, QActionGroup, QSizePolicy, QMessageBox
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QListWidget
