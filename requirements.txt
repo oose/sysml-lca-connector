@@ -1,0 +1,5 @@
+PyQt5
+PyQtWebEngine
+requests
+olca-ipc
+olca-schema
