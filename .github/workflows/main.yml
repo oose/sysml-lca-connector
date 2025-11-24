@@ -31,7 +31,7 @@ jobs:
       - name: Build EXE with PyInstaller
         shell: bash
         run: |
-          pyinstaller --onefile \
+          pyinstaller --onefile --windowed \
             --name sysml-lca-connector \
             --icon=src/logo.ico \
             src/sysml-lca-connector.py
