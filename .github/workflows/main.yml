@@ -34,6 +34,7 @@ jobs:
           pyinstaller --onefile --windowed \
             --name sysml-lca-connector \
             --icon=src/logo.ico \
+            --add-data "src/logo.ico;." \
             src/sysml-lca-connector.py
             
       - name: Prepare artifact folder

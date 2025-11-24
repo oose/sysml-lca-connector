@@ -74,9 +74,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("SysML-LCA connector")
         self.preferences=read_preferences()
-        # tbd: handle missing preferences
         self.sysmlserver=self.preferences["sysmlserver"]
-        self.setWindowIcon(QIcon('logo.png'))
+        global base_dir
+        icon_path = base_dir / 'logo.ico'
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.openLCAServerURL=self.preferences["openlcaserver"]
 
         self.createMenuBar()
