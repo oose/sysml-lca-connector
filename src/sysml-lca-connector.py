@@ -422,6 +422,7 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     try:
         app = QApplication(sys.argv)
+        QMessageBox.information(None, "Debug", "Vor dem Anzeigen des Hauptfensters")
         window = MainWindow()
         window.show()
         sys.exit(app.exec())
