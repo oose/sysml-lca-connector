@@ -61,7 +61,15 @@ def safe_preferences(preferences):
     
     pass
 
-# create_gui() 
+# create_gui()
+def resource_path(rel_path: str) -> str:
+    # function that gets the absolute path to resource, works for dev and for PyInstaller
+    if hasattr(sys, "_MEIPASS"):
+        base_dir = sys._MEIPASS  # temp folder created by PyInstaller
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_dir, rel_path)
+ 
 
 class MainWindow(QMainWindow):
     preferences=None
@@ -69,15 +77,14 @@ class MainWindow(QMainWindow):
     openLCAServerURL=None
     theModel=None
 
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SysML-LCA connector")
         self.preferences=read_preferences()
         self.sysmlserver=self.preferences["sysmlserver"]
-        global base_dir
-        icon_path = base_dir / 'logo.ico'
-        if icon_path.exists():
+
+        icon_path = resource_path('logo.ico')
+        if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(str(icon_path)))
         self.openLCAServerURL=self.preferences["openlcaserver"]
 
