@@ -1,0 +1,65 @@
+name: Build and Release sysml-lca-connector
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'          # z.B. v1.0.0, v1.2.3
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pyinstaller
+
+      - name: Build EXE with PyInstaller
+        shell: bash
+        run: |
+          pyinstaller --onefile \
+            --name sysml-lca-connector \
+            src/sysml-lca-connector.py
+
+      - name: Upload EXE as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sysml-lca-connector-exe
+          path: dist/sysml-lca-connector.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: sysml-lca-connector ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload EXE to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/sysml-lca-connector.exe
+          asset_name: sysml-lca-connector-${{ github.ref_name }}.exe
+          asset_content_type: application/octet-stream
