@@ -41,6 +41,7 @@ jobs:
           mkdir artifact
           copy dist\sysml-lca-connector.exe artifact\
           copy release-assets\readme.md artifact\
+          copy src\preferences.ini artifact\
           
       - name: Upload EXE as artifact
         uses: actions/upload-artifact@v4
@@ -71,7 +72,7 @@ jobs:
           asset_name: sysml-lca-connector-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
           
-      - name: Upload Windows info file to Release
+      - name: Upload Readme.md to Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-release-asset@v1
         env:
@@ -80,5 +81,16 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: release_assets/readme.md
           asset_name: readme.md
+          asset_content_type: text/plain
+
+      - name: Upload preferences.ini Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: src/preferences.ini
+          asset_name: preferences.ini
           asset_content_type: text/plain
 
