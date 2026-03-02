@@ -1,0 +1,16 @@
+library package elcd{
+/* flows from the elcd database: 
+    mappings to SI::QuantityValues and new definitions not existing in the Si library*/
+    
+    private import SI::*;
+    alias 'Number of items' for CountValue;
+    alias Length for LengthValue;
+    alias Area for AreaValue ;
+    alias Volume for VolumeValue;
+    alias Mass for MassValue;
+    alias Energy for EnergyValue ;
+    attribute def 'Net calorific value':> EnergyValue ;
+    attribute def 'Gross calorific value':> EnergyValue ;
+    alias Radioactivity for NuclearActivityValue ;
+    attribute def 'Area*time':> ScalarQuantityValue ;
+}
