@@ -9,5 +9,5 @@ If this happens, you have to unblock it:
 3. if blocked there is a security message in the lower part
 4. mark the checkbox "allow"
 
-The file is save. The complete sourcecoude is on GitHub:
+The file is safe. The complete sourcecoude is on GitHub:
 https://github.com/oose/sysml-lca-connector
