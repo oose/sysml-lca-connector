@@ -51,10 +51,10 @@ class SysMLLCAModel(SysMLModel):
             for subpart in part['ownedPart']:
                 subpartEntry=self.getElement(subpart)
                 count=self.getMultiplicity(subpartEntry).get('lowerBound',1)# we take the minimal value
-                print("Subpart: ",subpartEntry['name'],count,subpartEntry['type'])
-                for type in subpartEntry['type']:
-                    print("Type: ",type)
-                    partDefinition=self.getElement(type)
+                print("Subpart: ",subpartEntry['name'],count,subpartEntry.get('type'))
+                for type_ref in subpartEntry.get('type', []):
+                    print("Type: ",type_ref)
+                    partDefinition=self.getElement(type_ref)
                     partEntry["exchanges"].extend(getExchangesOfPart(partDefinition, flows, count))
             result.append(partEntry)
         return result
@@ -99,7 +99,7 @@ def test():
     #for flow in myModel.getFlows().values():
     #   print(flow['@id'],flow['name'], myModel.getExternalRef(flow))
     #print (myModel.getMetaChain(myModel.getElementbyId("017b7263-f1a4-4cde-9589-734d4718744b"),[['AttributeDefinition','ownedMember'],['MetadataUsage','feature'],['ReferenceUsage','ownedMember'],['LiteralString','value']]))
-    print(myModel.getProcesses())
+    print(myModel.getLCAParts())
     #saveModel(myModel)
 
 # comment this out, if test run successfully

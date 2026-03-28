@@ -27,16 +27,16 @@ class SysMLModel:
     
     def findElementId(self, name, type):
         for element in self.theModel.values():
-            if element['name'] == name and element['@type'] == type:
+            if element.get('name') == name and element['@type'] == type:
                 return element['@id']
         return None
 
     def getElementbyId(self, id):
-        return self.theModel[id]
+        return self.theModel.get(id)
 
     def getElement(self,reference):
-        if reference:
-            return self.theModel[reference.get('@id')]
+        if reference and reference.get('@id'):
+            return self.theModel.get(reference['@id'])
 
     def getDirectSubclasses(self,superclass):
         result={}
@@ -48,8 +48,11 @@ class SysMLModel:
     def isDirectSubclass(self, element, superclass):
         if element.get('ownedSubclassification'):
             for sub in element['ownedSubclassification']:
-                general=self.getElement(sub)['general']
-                return general['@id']==superclass
+                subElement = self.getElement(sub)
+                if subElement and subElement.get('general'):
+                    if subElement['general'].get('@id') == superclass:
+                        return True
+        return False
             
     def getMetaChain(self,element,metachain):
         """
@@ -72,6 +75,8 @@ class SysMLModel:
         if isinstance(element,list):
             element=element[0]
         if wantedType==None or element['@type']==wantedType:
+            if attributeName not in element:
+                return None
             if isValue( element[attributeName]): 
                 # a value is never referencing another element
                 if len(metachain)==1:
@@ -137,7 +142,7 @@ class SysMLModel:
 
     def getOwnedMembersWithType(self,element,typeList):
         result=[]
-        for member in element['ownedMember']:
+        for member in element.get('ownedMember', []):
             ownedmember=self.getElement(member)
             if ownedmember['@type'] in typeList:
                 result.append(ownedmember)
@@ -168,8 +173,10 @@ class SysMLModel:
         # 2. negative numerical value: - ownedMember.argument[0].value for operator "-"
         # 3. positive scalar value:      ownedMember.argument[0].value for operator "[" ownedMember.argument[1].referent 
         # 4. negative scalar value:    - ownedMember.argument[0].argument[0].value for operator "-" ownedMember.argument[0].argument[1].referent
-        element=self.getOwnedMembersWithType(attributeUsage,['LiteralInteger','LiteralRational','OperatorExpression'])[0]
-        # assumption: there is only one member of the types
+        candidates = self.getOwnedMembersWithType(attributeUsage, ['LiteralInteger','LiteralRational','OperatorExpression'])
+        if not candidates:
+            return None
+        element = candidates[0]
 
         sign=1
         if element['@type']=='OperatorExpression':
