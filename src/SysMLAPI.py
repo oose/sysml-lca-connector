@@ -17,8 +17,11 @@ def getProject(host, project):
 def getHeadCommit(host, project):
     response=requests.get(f"{host}/projects/{project}/branches")
     if response.status_code != 200:
-        raise Exception("Server returned code " + response.status_code) 
-    return response.json()[0]['head']['@id']
+        raise Exception(f"Server returned code {response.status_code}")
+    branches = response.json()
+    if not branches:
+        raise Exception("No branches found in project")
+    return branches[0]['head']['@id']
 
 def getElements(host, project, commit=None):
     if commit is None:
@@ -89,7 +92,9 @@ def getExchangeID(host, project):
          raise Exception(f"Server returned code {response.status_code}") 
 
     query_response_json = response.json()
- 
+
+    if not query_response_json:
+        raise Exception("No Exchange attribute definition found in project")
     #returns the ID of the attribute definition exchange
     return query_response_json[0]['@id']
  
