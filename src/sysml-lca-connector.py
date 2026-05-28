@@ -51,15 +51,13 @@ def read_preferences():
         }
     return preferences
 
-def safe_preferences(preferences):
+def save_preferences(preferences):
     config = configparser.ConfigParser()
     config['DEFAULT'] = preferences
 
     config_path = os.path.join(os.path.dirname(__file__), 'preferences.ini')
     with open(config_path, 'w') as configfile:
         config.write(configfile)
-    
-    pass
 
 # create_gui()
 def resource_path(rel_path: str) -> str:
@@ -158,13 +156,19 @@ class MainWindow(QMainWindow):
 
         def select_project():
             index = project_listbox.currentRow()
+            if index < 0:
+                QMessageBox.warning(dialog, "Warning", "Please select a project.")
+                return
             project = filtered_projects[index]
             dialog.accept()
             self.open_project(project)
             return project
-        
+
         def synchronize_project():
             index = project_listbox.currentRow()
+            if index < 0:
+                QMessageBox.warning(dialog, "Warning", "Please select a project.")
+                return
             project = filtered_projects[index]
             dialog.accept()
             self.open_project(project)
@@ -173,6 +177,9 @@ class MainWindow(QMainWindow):
 
         def delete_project():
             index = project_listbox.currentRow()
+            if index < 0:
+                QMessageBox.warning(dialog, "Warning", "Please select a project.")
+                return
             project = filtered_projects[index]
             dialog.accept()
             try :
@@ -187,7 +194,6 @@ class MainWindow(QMainWindow):
         delete_button.clicked.connect(delete_project)
 
         dialog.exec_()
-        pass
 
     def projectFromString(self,project):
         name=project.split("(")[0].strip() # everything before the first ( is the name
@@ -211,7 +217,7 @@ class MainWindow(QMainWindow):
         recent_projects.insert(0, f"{name} ({uuid})")
         
         self.preferences["recent_projects"] = ",".join(recent_projects[:3])
-        safe_preferences(self.preferences)
+        save_preferences(self.preferences)
         self.update_recent_projects_menu()
 
     def open_project(self, theProject):
@@ -282,19 +288,6 @@ class MainWindow(QMainWindow):
 
     def open_preferences_dialog(self):
         # Open a dialog to handle preferences
-        # Implement your logic here to open a dialog for handling preferences
-        # You can use tkinter's messagebox or a custom dialog box
-        def ok_button_clicked():
-            self.sysmlserver = entrySysML.get()
-            self.preferences["sysmlserver"] = self.sysmlserver
-            self.openLCAServerURL = entryLCA.get()
-            self.preferences["openlcaserver"] = self.openLCAServerURL
-            safe_preferences(self.preferences)
-            dialog.destroy()
-
-        def cancel_button_clicked():
-            dialog.destroy()
-
         dialog = QDialog(self)
         dialog.setWindowTitle("Preferences Dialog")
         dialog.setGeometry(100, 100, 500, 200)
@@ -327,7 +320,7 @@ class MainWindow(QMainWindow):
             self.preferences["sysmlserver"] = self.sysmlserver
             self.openLCAServerURL = entryLCA.text()
             self.preferences["openlcaserver"] = self.openLCAServerURL
-            safe_preferences(self.preferences)
+            save_preferences(self.preferences)
             dialog.accept()
 
         def cancel_button_clicked():
@@ -337,8 +330,6 @@ class MainWindow(QMainWindow):
         cancel_button.clicked.connect(cancel_button_clicked)
 
         dialog.exec_()
-        
-        pass
 
     def search_textbox(self):
         def perform_search():
@@ -405,12 +396,14 @@ class MainWindow(QMainWindow):
             for p in self.theModel.getLCAParts():
                 s+=f"<h3>{p['name']}</h3>\n"
                 for exch in p['exchanges']:
-                    unit = self.theModel.getElement(exch['value']['mRef'])
-                    if unit: 
-                        unit = unit.get('declaredShortName')
+                    value = exch.get('value')
+                    if value and value.get('mRef'):
+                        unitElement = self.theModel.getElement(value['mRef'])
+                        unit = unitElement.get('declaredShortName') if unitElement else "Number of items"
                     else:
                         unit = "Number of items"
-                    s+=f"<p>{exch['name']} : {exch['value']['num']} {unit}</p>\n"
+                    num = value['num'] if value else ''
+                    s+=f"<p>{exch['name']} : {num} {unit}</p>\n"
             s+="</body></html>"
         return s
 
@@ -432,9 +425,10 @@ class MainWindow(QMainWindow):
         print("set_SysML_Model_view")
         self.sysml_model_action.setChecked(True)
         self.browser.setHtml("")
-        print ("set_SysML_Model_view", self.theModel.asHTML())
         if self.theModel:
-            self.browser.setHtml(self.theModel.asHTML())    
+            html = self.theModel.asHTML()
+            print("set_SysML_Model_view", html)
+            self.browser.setHtml(html)
 
     def synchronizeProcesses(self):
         try:

@@ -69,11 +69,12 @@ class openLCAServer:
         exchange.is_input = False
         exchange.is_quantitative_reference = True
 
-        for exch in exchanges:    
-            flow:olca_schema.FLOW = self.client.get(olca_schema.Flow, exch['id'])
-            #u1:olca_schema.UNIT = openLCAClient.get(olca_schema.UnitGroup, "5beb6eed-33a9-47b8-9ede-1dfe8f679159")
+        for exch in exchanges:
+            flow = self.client.get(olca_schema.Flow, exch['id'])
+            if not flow:
+                print(f"Warning: Flow with id {exch['id']} not found, skipping exchange")
+                continue
             # tbd: unit cannot be found with this method. The standard unit of the flow is used.
-            #print(exch['id'],exch['value']['num'],exch['value']['mRef'])
             exchange = olca_schema.new_exchange(process, flow, abs(exch['value']['num']))
             exchange.is_input = exch['value']['num'] < 0
         
@@ -81,7 +82,7 @@ class openLCAServer:
         return process.id
     
     def printListOfFlowPropertiesWithCount(self):
-    # how often is a certain flow property used
+        # how often is a certain flow property used
         flows = self.getFlows()
         flow_property_count = {}
         for flow in flows:
