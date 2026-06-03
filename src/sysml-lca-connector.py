@@ -37,8 +37,7 @@ from openLCAAPI import openLCAServer
 def read_preferences():
     # Read preferences from a configuration file
     config = configparser.ConfigParser()
-    config_path = os.path.join(os.path.dirname(__file__), 'preferences.ini')
-    # the config file is expected to be in the same directory as this script
+    config_path = user_data_path('preferences.ini')
     config.read(config_path)
 
     preferences = config['DEFAULT']
@@ -55,7 +54,7 @@ def safe_preferences(preferences):
     config = configparser.ConfigParser()
     config['DEFAULT'] = preferences
 
-    config_path = os.path.join(os.path.dirname(__file__), 'preferences.ini')
+    config_path = user_data_path('preferences.ini')
     with open(config_path, 'w') as configfile:
         config.write(configfile)
     
@@ -66,6 +65,14 @@ def resource_path(rel_path: str) -> str:
     # function that gets the absolute path to resource, works for dev and for PyInstaller
     if hasattr(sys, "_MEIPASS"):
         base_dir = sys._MEIPASS  # temp folder created by PyInstaller
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_dir, rel_path)
+
+def user_data_path(rel_path: str) -> str:
+    # for writable user files (e.g. preferences.ini): resolve next to the exe when packaged
+    if hasattr(sys, "_MEIPASS"):
+        base_dir = os.path.dirname(sys.executable)
     else:
         base_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_dir, rel_path)
