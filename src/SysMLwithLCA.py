@@ -64,6 +64,8 @@ class SysMLLCAModel(SysMLModel):
         # assumption: the AttributeDefinition has only one MetadataUsage and this is ExternalRef or a substype like lca-flow
         # tbd: select the MetadataUsage typed by LCA-Flow
         # element.ownedMember.feature.ownedMember.value
+        test = self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','feature'],['ReferenceUsage','ownedMember'],['LiteralString','value']])
+        print("getExternalRef: ", element['@id'], element['name'], test)
         return self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','feature'],['ReferenceUsage','ownedMember'],['LiteralString','value']])
 
     def getExternalRef1(self, element):

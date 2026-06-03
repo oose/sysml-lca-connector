@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QActionGroup, QSizePolicy
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QListWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QUrl
 import configparser
 
 from SysMLAPI import getProjects, deleteProject
@@ -288,6 +289,10 @@ class MainWindow(QMainWindow):
         lca_flows_action.setCheckable(True)
         lca_flows_action.triggered.connect(lambda: self.set_LCA_Flows_view())
 
+        view_menu.addSeparator()
+        open_in_browser_action = view_menu.addAction("Open SysML Model in Browser")
+        open_in_browser_action.triggered.connect(self.open_html_in_browser)
+
         view_group = QActionGroup(self)
         view_group.addAction(self.sysml_model_action)
         view_group.addAction(lca_processes_action)
@@ -429,13 +434,15 @@ class MainWindow(QMainWindow):
  
 
     def set_SysML_Model_view(self):
-        print("set_SysML_Model_view")
         self.sysml_model_action.setChecked(True)
         self.browser.setHtml("")
         if self.theModel:
-            html = self.theModel.asHTML()
-            print("set_SysML_Model_view", html)
-            self.browser.setHtml(html)
+            self.theModel.asHTML()
+            self.browser.load(QUrl.fromLocalFile(os.path.abspath("model.api.html")))
+
+    def open_html_in_browser(self):
+        import webbrowser
+        webbrowser.open(os.path.abspath("model.api.html"))
 
     def synchronizeProcesses(self):
         try:

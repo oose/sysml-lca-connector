@@ -1,6 +1,6 @@
 # a class representing a SysML model
 
-from SysMLAPI import getProject, getElements
+from SysMLAPI import getProject, getElements, PAGE_SIZE_FOR_ELEMENTS
 
 def listToDictonary(input: list) -> dict:
     # uses the @id as key for the dictionary
@@ -20,7 +20,9 @@ class SysMLModel:
         projectData=getProject(host,project)
         self.name=projectData.get('name')
         self.theModel =listToDictonary(getElements(host,project,commit))
-        print ("model size = ",len(self.theModel))
+        print ("model loaded \n size = ",len(self.theModel))
+        if len(self.theModel)==PAGE_SIZE_FOR_ELEMENTS:
+            print(f"Warning: the model contains exactly {PAGE_SIZE_FOR_ELEMENTS} elements. It probably hit the page size limit. Consider increasing the page size in the API call.")
 
     def getElements(self):
         return self.theModel
@@ -197,8 +199,8 @@ class SysMLModel:
     def asHTML(self):
         def getName(element):
             # if the element doesn't have a name, return the last 5 characters of the id
-            return element.get('name') if element.get('name') else f"…{element['@id'][-5:]}"
-            #return element.get('name',f"…{element['@id'][-5:]}")
+            return (element.get('name') or element.get('declaredName') or element.get('shortName') or
+                    element.get('memberName') or element.get('memberShortName') or f"…{element['@id'][-5:]}")
 
         def getHtmlReference(element):
             try:
@@ -208,65 +210,82 @@ class SysMLModel:
                 return ""
 
         def getValues(element,attributeName):
-            result=""   
+            parts=[]
             try:
                 if element.get(attributeName):
-                    result=f"<h4>{attributeName}</h4>\n"
-                    if isinstance(element[attributeName],str):
-                        result+=f"<p>\"{element[attributeName]}\"</p>\n"    
-                    elif isinstance(element.get(attributeName),dict):
-                        element=self.theModel[element[attributeName]['@id']]
-                        result+=f"<p>{getHtmlReference(element)}</p>\n"
-                    elif isinstance(element.get(attributeName), bool):
-                        result+=f"<p>{element[attributeName]}</p>\n"
-                    elif isinstance(element.get(attributeName), int):
-                        result+=f"<p>{element[attributeName]}</p>\n"
-                    elif isinstance(element.get(attributeName), float):
-                        result+=f"<p>{element[attributeName]}</p>\n"
+                    theAttribute=element[attributeName]
+                    parts.append(f"<h4>{attributeName}</h4>\n")
+                    if isinstance(theAttribute,str):
+                        parts.append(f"<p>\"{theAttribute}\"</p>\n")
+                    elif isinstance(theAttribute,dict):
+                        # expected: reference to another element, just one entry for @id
+                        el=self.theModel.get(theAttribute['@id'])
+                        if el:
+                            parts.append(f"<p>{getHtmlReference(el)}</p>\n")
+                        else:
+                            parts.append(f"<p>{theAttribute['@id']}</p>\n")
+                    elif isinstance(theAttribute, (bool, int, float)):
+                        parts.append(f"<p>{theAttribute}</p>\n")
                     else:
+                        # expected: list of references to other elements
                         for e in element.get(attributeName,[]):
                             theElement=self.theModel.get(e['@id'])
                             if theElement:
-                                result+=f"<p>{getHtmlReference(theElement)}</p>\n"
+                                parts.append(f"<p>{getHtmlReference(theElement)}</p>\n")
                             else:
-                                result+=f"<p>{e}</p>\n"
+                                parts.append(f"<p>{e['@id']}</p>\n")
             except Exception as ex:
                 print(f"Error in getValues: {attributeName} - {ex}")
-            return result
+            return "".join(parts)
 
         def isReference(element):
             # element is of {'@id': 'xyz} form
             return isinstance(element,dict) and element.get('@id')
+
+        def isExternal(element):
+            # detect external elements:
+            # has only one property with Value: isLibraryElement==true
+            if not isinstance(element, dict):
+                return False
+            meaningful = [k for k, v in element.items() if v is not None and v != [] and k not in ['@id','@type','name','qualifiedName','elementId']]
+            return meaningful == ['isLibraryElement'] and element.get('isLibraryElement') is True
         
         print("asHTML")
-        s=f"<!doctype html><html><head><meta charset=\"UTF-8\"><title>{self.name}</title>"
-        s+="""
+        parts=[f"<!doctype html><html><head><meta charset=\"UTF-8\"><title>{self.name}</title>"]
+        parts.append("""
         <style>@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap');
-        body {font-family: 'Roboto Mono', 'Courier New', monospace;} 
-        h3 {font-size: 12pt; font-weight: bold;margin-bottom:0;margin-top:6pt;border-top: 1px solid Lightgrey;} 
-        h4 {font-size: 9pt; font-weight: bold;margin-top:0;margin-bottom:0;margin-left:2em;} 
+        body {font-family: 'Roboto Mono', 'Courier New', monospace;}
+        h3 {font-size: 12pt; font-weight: bold;margin-bottom:0;margin-top:6pt;border-top: 1px solid Lightgrey;}
+        h4 {font-size: 9pt; font-weight: bold;margin-top:0;margin-bottom:0;margin-left:2em;}
         p {font-size: 9pt; margin-left:2em; margin-top:0; margin-bottom:0;}
-        summary {font-size: 9pt; font-weight: normal;margin-left:2em;} 
+        summary {font-size: 9pt; font-weight: normal;margin-left:2em;}
         span.metaclass {font-size: 9pt; font-weight:normal;}</style>
         </head>
         <body>
-        """
+        """)
         visibleFields=['owner','type','ownedSubclassification','superclassifier','ownedMember','argument','operator','referent','body']
         for element in self.theModel.values():
-            s+=f"<h3 id=\"{element['@id']}\"><span class=\"metaclass\">«{element['@type']}»</span>&nbsp;{getName(element)}"
+            parts.append(f"<h3 id=\"{element['@id']}\"><span class=\"metaclass\">«{element['@type']}»</span>&nbsp;{getName(element)}")
             if element.get('value'):
                 if isReference(element['value']):
-                    s+=f"&nbsp;=&nbsp;{getHtmlReference(element['value'])}"
+                    parts.append(f"&nbsp;=&nbsp;{getHtmlReference(element['value'])}")
                 else:
-                    s+=f"&nbsp;=&nbsp;{element['value']}"
-            s+="</h3>\n"
-            for f in visibleFields:
-                s+=getValues(element,f)
-            s += f"<details><summary>more…</summary>"
-            for subelement in element:
-                if subelement not in set(visibleFields).union({'@id','@type','name','qualifiedName','elementId'}):
-                    s += getValues(element, subelement)
-            s += "</details>\n"
-        s+="</body></html>"
-        print(s)
+                    parts.append(f"&nbsp;=&nbsp;{element['value']}")
+            if isExternal(element):
+                parts.append(f"&nbsp;<span class=\"metaclass\">[external]</span>") 
+                parts.append("</h3>\n")
+            else: 
+                parts.append("</h3>\n")
+                for f in visibleFields:
+                    parts.append(getValues(element,f))
+                parts.append("<details><summary>more…</summary>")
+                for subelement in element:
+                    if subelement not in set(visibleFields).union({'@id','@type','name','qualifiedName','elementId'}):
+                        parts.append(getValues(element, subelement))
+                parts.append("</details>\n")
+        parts.append("</body></html>")
+        s = "".join(parts)
+        with open("model.api.html", "w", encoding="utf-8") as f:
+            f.write(s)
+        print ("model.api.html created")
         return s     

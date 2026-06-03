@@ -1,0 +1,8 @@
+src/__pycache__/openLCAAPI.cpython-313.pyc
+.gitignore
+src/__pycache__/SysMLAPI.cpython-313.pyc
+src/__pycache__/SysMLModel.cpython-313.pyc
+src/__pycache__/SysMLwithLCA.cpython-313.pyc
+model/SysML 2 library and examples.mdzip.bak
+changes.md
+src/.cache/

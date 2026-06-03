@@ -1,4 +1,10 @@
 import requests
+import json
+from pathlib import Path
+
+PAGE_SIZE_FOR_ELEMENTS = 10000
+
+_CACHE_DIR = Path(__file__).parent / ".cache"
 
 
 def getProjects(host):
@@ -26,10 +32,16 @@ def getHeadCommit(host, project):
 def getElements(host, project, commit=None):
     if commit is None:
         commit = getHeadCommit(host, project)
-    response = requests.get(f"{host}/projects/{project}/commits/{commit}/elements?page%5Bsize%5D=1000")
+    cache_file = _CACHE_DIR / f"{project}_{commit}.json"
+    if cache_file.exists():
+        return json.loads(cache_file.read_text(encoding="utf-8"))
+    response = requests.get(f"{host}/projects/{project}/commits/{commit}/elements?page%5Bsize%5D={PAGE_SIZE_FOR_ELEMENTS}")
     if response.status_code != 200:
-        raise Exception(f"Server returned code {response.status_code}") 
-    return response.json()
+        raise Exception(f"Server returned code {response.status_code}")
+    data = response.json()
+    _CACHE_DIR.mkdir(exist_ok=True)
+    cache_file.write_text(json.dumps(data), encoding="utf-8")
+    return data
 
 def getElementsAsString(host, project, commit=None):
     # returns the elements of the given project as multiline string
