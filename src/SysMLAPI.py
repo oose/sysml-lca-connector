@@ -4,7 +4,9 @@ from pathlib import Path
 
 PAGE_SIZE_FOR_ELEMENTS = 10000
 
-_CACHE_DIR = Path(__file__).parent / ".cache"
+import sys
+_base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+_CACHE_DIR = _base / ".cache"
 
 
 def getProjects(host):
