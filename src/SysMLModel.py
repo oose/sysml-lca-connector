@@ -29,7 +29,7 @@ class SysMLModel:
     
     def findElementId(self, name, type):
         for element in self.theModel.values():
-            if element.get('name') == name and element['@type'] == type:
+            if element.get('declaredName') == name and element['@type'] == type:
                 return element['@id']
         return None
 
@@ -56,7 +56,7 @@ class SysMLModel:
                         return True
         return False
             
-    def getMetaChain(self,element,metachain):
+    def getMetaChain(self,element,metachain,resulttype:list=None):
         """
         Retrieves the element(s) at the end of the metachain.
         Args:
@@ -64,6 +64,7 @@ class SysMLModel:
             metachain (list of lists): A list of lists, where each inner list contains two elements:
                 - The type of the element (str).
                 - The name of the reference to the next element (str).
+            resulttype (list, optional): A list of accepted types for the resulting element(s). If provided, only elements whose @type is in the list are returned.
         Returns:
             The element(s) at the end of the metachain if found, otherwise None.
         """      
@@ -72,37 +73,44 @@ class SysMLModel:
 
         wantedType = metachain[0][0]
         attributeName = metachain[0][1]
-        if element==None:
+        if element is None:
             return None
-        if isinstance(element,list):
-            element=element[0]
+        if isinstance(element, list):
+            results = [self.getMetaChain(e, metachain, resulttype) for e in element if e is not None]
+            results = [item for r in results for item in (r if isinstance(r, list) else [r]) if item is not None]
+            return results if results else None
         if wantedType==None or element['@type']==wantedType:
             if attributeName not in element:
                 return None
-            if isValue( element[attributeName]): 
+            if isValue( element[attributeName]):
                 # a value is never referencing another element
                 if len(metachain)==1:
-                    return element[attributeName]    
+                    return element[attributeName]
                 else:
                     return None # if we are not at the end of the chain, the value is not what we are looking for
-            elif isinstance(element[attributeName],dict): 
+            elif isinstance(element[attributeName],dict):
                 # expected: reference to another element, just one entry for @id
                 subelement=self.getElement(element[attributeName])
                 if len(metachain)==1:
+                    if resulttype is not None and isinstance(subelement, dict) and subelement.get('@type') not in resulttype:
+                        return None
                     return subelement
                 else:
-                    return self.getMetaChain(subelement,metachain[1:])
+                    return self.getMetaChain(subelement,metachain[1:],resulttype)
             elif isinstance(element[attributeName],list):
                 # expected: list of references to other elements
                 listOfSubelements=[]
-                for subElementReference in element[attributeName]: 
+                for subElementReference in element[attributeName]:
                     subelement=self.getElement(subElementReference)
                     listOfSubelements.append(subelement)
                 if len(listOfSubelements)==0: listOfSubelements=None
                 if len(metachain)==1:
+                    if resulttype is not None and listOfSubelements is not None:
+                        listOfSubelements = [e for e in listOfSubelements if isinstance(e, dict) and e.get('@type') in resulttype]
+                        if len(listOfSubelements)==0: listOfSubelements=None
                     return listOfSubelements
                 else:
-                    return self.getMetaChain(listOfSubelements,metachain[1:])
+                    return self.getMetaChain(listOfSubelements,metachain[1:],resulttype)
             else:
                 return None  
 
@@ -111,11 +119,15 @@ class SysMLModel:
 
     def getSubsettedFeatures(self,element):
         # ownedSubsetting.subsettedFeature
-        return self.getMetaChain(element,[[None,'ownedSubsetting'],['Subsetting','subsettedFeature']])        
+        # return self.getMetaChain(element,[[None,'ownedSubsetting'],['Subsetting','subsettedFeature']]) only works if the repository contains derived values.       
+        return self.getMetaChain(element,[[None,'ownedRelationship'],['Subsetting','subsettedFeature']])        
     
     def getUsedMetadata(self,element):
         # ownedMember.type.ownedMember
-        return self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','type']])
+        #return self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','type']])
+        # this would only work, if derived fields have been stored.
+        return self.getMetaChain(element,[[None,'ownedRelationship'],['OwningMembership','target'],
+                                        ['MetadataUsage','ownedRelationship'],['FeatureTyping','type']]) 
 
     def usesMetadata(self, element, metadataID):
         metadataList = self.getUsedMetadata(element)
@@ -142,13 +154,8 @@ class SysMLModel:
                     result.append(element)
         return result
 
-    def getOwnedMembersWithType(self,element,typeList):
-        result=[]
-        for member in element.get('ownedMember', []):
-            ownedmember=self.getElement(member)
-            if ownedmember['@type'] in typeList:
-                result.append(ownedmember)
-        return result
+    def getOwnedFeaturesWithType(self, element, typeList):
+        return self.getMetaChain(element,[[None,'ownedRelationship'],['FeatureValue','target']],typeList)
 
     def getMultiplicity(self,feature):
         # cases
@@ -169,13 +176,22 @@ class SysMLModel:
             upperBound=1
         return {'lowerBound':lowerBound,'upperBound':upperBound}
 
+    def getArguments(self, element):
+        # returns the arguments of an element like OperatorExpression
+        return self.getMetaChain(element,[[None,'ownedRelationship'],['ParameterMembership','target' ], 
+            ['Feature','ownedRelationship'],['FeatureValue','target']])
+
+    def getReferent(self, featureReferenceExpression):
+        # returns the referent of a feature reference expression like ScalarQuantityValue
+        return self.getMetaChain(featureReferenceExpression,[[None,'ownedRelationship'],['Membership','target']])
+
     def getDefaultValue(self,attributeUsage):
         # cases
         # 1. positive numerical value:   ownedMember.value
         # 2. negative numerical value: - ownedMember.argument[0].value for operator "-"
         # 3. positive scalar value:      ownedMember.argument[0].value for operator "[" ownedMember.argument[1].referent 
         # 4. negative scalar value:    - ownedMember.argument[0].argument[0].value for operator "-" ownedMember.argument[0].argument[1].referent
-        candidates = self.getOwnedMembersWithType(attributeUsage, ['LiteralInteger','LiteralRational','OperatorExpression'])
+        candidates = self.getOwnedFeaturesWithType(attributeUsage, ['LiteralInteger','LiteralRational','OperatorExpression'])
         if not candidates:
             return None
         element = candidates[0]
@@ -184,7 +200,7 @@ class SysMLModel:
         if element['@type']=='OperatorExpression':
             operator=element['operator']
             if operator == '-': # negation operator
-                element=self.getElement(element['argument'][0])
+                element=self.getArguments(element)[0] # there is only one argument for the negation operator
                 sign = -1
         
         if element['@type'] in ['LiteralInteger','LiteralRational']: 
@@ -192,9 +208,9 @@ class SysMLModel:
         elif element['@type']=='OperatorExpression':
             operator=element['operator']
             if operator=='[': # ScalarQuantityValue Construction operator
-                argument0=self.getElement(element['argument'][0])
-                argument1=self.getElement(element['argument'][1])
-                return {'num':sign * argument0['value'],'mRef':argument1['referent']}
+                argument=self.getArguments(element)
+                
+                return {'num':sign * argument[0]['value'],'mRef':self.getReferent(argument[1])[0]}
             
     def asHTML(self):
         def getName(element):
@@ -227,13 +243,18 @@ class SysMLModel:
                     elif isinstance(theAttribute, (bool, int, float)):
                         parts.append(f"<p>{theAttribute}</p>\n")
                     else:
-                        # expected: list of references to other elements
+                        # expected: list of references to other elements or list of strings
                         for e in element.get(attributeName,[]):
-                            theElement=self.theModel.get(e['@id'])
-                            if theElement:
-                                parts.append(f"<p>{getHtmlReference(theElement)}</p>\n")
+                            if isinstance(e, str):
+                                parts.append(f"<p>\"{e}\"</p>\n")
+                            elif isinstance(e, dict):
+                                theElement=self.theModel.get(e['@id'])
+                                if theElement:
+                                    parts.append(f"<p>{getHtmlReference(theElement)}</p>\n")
+                                else:
+                                    parts.append(f"<p>{e['@id']}</p>\n")
                             else:
-                                parts.append(f"<p>{e['@id']}</p>\n")
+                                parts.append(f"<p>unexpected type of {e}</p>\n")
             except Exception as ex:
                 print(f"Error in getValues: {attributeName} - {ex}")
             return "".join(parts)

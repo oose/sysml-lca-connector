@@ -5,6 +5,7 @@ class SysMLLCAModel(SysMLModel):
     LCAPartId=""
     ExchangeId=""
     FlowId=""
+    ExternalRefId=""
     
     def __init__(self, host, project, commit=None):
         print ("SysMLLCAModel: ",host,project,commit)
@@ -12,6 +13,7 @@ class SysMLLCAModel(SysMLModel):
         self.LCAPartId = self.findElementId(name="LCA-Part", type="MetadataDefinition")
         self.ExchangeId = self.findElementId(name="LCA-Exchange", type="MetadataDefinition")  
         self.FlowId = self.findElementId(name="LCA-Flow", type="MetadataDefinition")
+        self.ExternalRefId = self.findElementId(name="ExternalRef", type="MetadataDefinition")
 
     def getFlows(self):
         # all attributes with metadata LCA-Flow
@@ -32,42 +34,57 @@ class SysMLLCAModel(SysMLModel):
         
         def getExchangesOfPart(part, flows, factor=1):
             result=[]
-            exchanges=self.filterListByMetadata(part['ownedFeature'],self.ExchangeId)
+            ownedAttributes=self.getMetaChain(part,[[None,'ownedRelationship'],['FeatureMembership','target']],['AttributeUsage'])
+            exchanges=self.filterListByMetadata(ownedAttributes,self.ExchangeId)
             if exchanges:
                 for exchange in exchanges:
                     lcaFlow=self.getSubsettedFeatures(exchange)
-                    if lcaFlow and lcaFlow['@id'] in flows:
-                        value=self.getDefaultValue(exchange)
-                        value['num']=value['num']*factor
-                        result.append({'id':flows[lcaFlow['@id']],'name':self.getElement(lcaFlow)['name'],'value':value})
+                    for f in lcaFlow:
+                        if  f['@id'] in flows:
+                            value=self.getDefaultValue(exchange)
+                            value['num']=value['num']*factor
+                            result.append({'id':flows[f['@id']],'name':f['declaredName'],'value':value})
+                            break # we assume that there is only one LCA-Flow per exchange
             return result
 
         result=[]
         flows=self.getFlows()
         lcaParts=self.getElementsWithMetadata("PartDefinition",self.LCAPartId)
         for part in lcaParts.values(): # create an LCA process
-            partEntry={"name":part['name'],"exchanges":[]}
+            partEntry={"name":part['declaredName'],"exchanges":[]}
             partEntry["exchanges"].extend(getExchangesOfPart(part, flows))
             for subpart in part['ownedPart']:
                 subpartEntry=self.getElement(subpart)
                 count=self.getMultiplicity(subpartEntry).get('lowerBound',1)# we take the minimal value
-                print("Subpart: ",subpartEntry['name'],count,subpartEntry.get('type'))
+                print("Subpart: ",subpartEntry['declaredName'],count,subpartEntry.get('type'))
                 for type_ref in subpartEntry.get('type', []):
                     print("Type: ",type_ref)
                     partDefinition=self.getElement(type_ref)
                     partEntry["exchanges"].extend(getExchangesOfPart(partDefinition, flows, count))
             result.append(partEntry)
         return result
-
+    
     def getExternalRef(self, element):
         # finds the Metadata with the external reference uuid
         # assumption: the AttributeDefinition has only one MetadataUsage and this is ExternalRef or a substype like lca-flow
-        # tbd: select the MetadataUsage typed by LCA-Flow
         # element.ownedMember.feature.ownedMember.value
-        test = self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','feature'],['ReferenceUsage','ownedMember'],['LiteralString','value']])
-        print("getExternalRef: ", element['@id'], element['name'], test)
-        return self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','feature'],['ReferenceUsage','ownedMember'],['LiteralString','value']])
-
+        metadataUsage = self.getMetaChain(element,[[None,'ownedRelationship'],['OwningMembership','target']],['MetadataUsage'])
+        # tbd:filter those that are typed by ExternalRef
+        feature = self.getMetaChain(metadataUsage,[[None,'ownedRelationship']],['FeatureMembership'])
+        if feature:
+            feature = [f for f in feature if f.get('memberName') == 'uuid']
+        
+            #print("getExternalRef: ", element['declaredName'],self.getMetaChain(feature,[[None,'target'],
+            #                                ['ReferenceUsage','ownedRelationship'],['FeatureValue','target'],
+            #                                ['LiteralString','value']])[0])
+            return self.getMetaChain(feature,[[None,'target'],
+                                            ['ReferenceUsage','ownedRelationship'],['FeatureValue','target'],
+                                            ['LiteralString','value']])[0]
+        else:
+            return None
+        # return self.getMetaChain(element,[[None,'ownedMember'],['MetadataUsage','feature'],['ReferenceUsage','ownedMember'],['LiteralString','value']])
+        # this only works if the repository contains derived values.
+ 
     def getExternalRef1(self, element):
         # element.ownedMember.feature.ownedMember.value
         # not using the generic getMetaChain method

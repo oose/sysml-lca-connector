@@ -410,7 +410,7 @@ class MainWindow(QMainWindow):
                 for exch in p['exchanges']:
                     value = exch.get('value')
                     if value and value.get('mRef'):
-                        unitElement = self.theModel.getElement(value['mRef'])
+                        unitElement = value['mRef']
                         unit = unitElement.get('declaredShortName') if unitElement else "Number of items"
                     else:
                         unit = "Number of items"
