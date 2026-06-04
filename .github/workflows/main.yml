@@ -43,19 +43,20 @@ jobs:
           copy dist\sysml-lca-connector.exe artifact\
           copy release-assets\readme.md artifact\
           copy src\preferences.ini artifact\
-          
-      - name: Upload EXE as artifact
+
+      - name: Create zip
+        shell: pwsh
+        run: Compress-Archive -Path artifact\* -DestinationPath sysml-lca-connector.zip
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: sysml-lca-connector
-          path: artifact\
-          
+          path: sysml-lca-connector.zip
+
       - name: Create or update Release and upload assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/sysml-lca-connector.exe
-            release-assets/readme.md
-            src/preferences.ini
+          files: sysml-lca-connector.zip
 
